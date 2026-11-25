@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-25T13:13+00:00",
+ "updated": "2026-11-25T16:00+00:00",
  "unresolved": 0,
  "points": [
   {
@@ -33,6 +33,14 @@
    "lat": 43.61703,
    "lon": -5.88789,
    "url": "https://app.notion.com/p/TheNextPangea-421d94147d508003bcf0cae8facf45de"
+  },
+  {
+   "db": "Sin título",
+   "title": "materplat",
+   "place": "Avenida Principal, 2, 36475 O Porriño (Pontevedra), España",
+   "lat": 42.11086,
+   "lon": -8.62009,
+   "url": "https://app.notion.com/p/materplat-423d94147d50802aa78bfc2befb3c84e"
   }
  ]
 }
