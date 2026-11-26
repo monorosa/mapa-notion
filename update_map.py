@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Lee todas las bases de datos de Notion compartidas con tu integración,
-recoge el campo «Lugar» (o el nombre que configures), lo geocodifica
+recoge el campo «Lugar» (o el nombre que configures), lo geocodifica,
+clasifica cada base en una categoría (según la página de la que cuelga)
 y escribe docs/data.json. docs/index.html dibuja el mapa a partir de ese archivo.
 
 Solo usa la librería estándar de Python (no hay que instalar nada).
@@ -11,6 +12,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,6 +23,20 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 PROPERTY_NAME = os.environ.get("PROPERTY_NAME", "Lugar")
 GEOCODER_CONTACT = os.environ.get("GEOCODER_CONTACT", "notion-map-personal")
 NOTION_VERSION = "2025-09-03"
+
+# ----------------------------------------------------------------------------
+# CATEGORÍAS Y COLORES  (edita aquí si quieres cambiar algo)
+# Una base de datos pertenece a la categoría cuyo «keyword» aparezca en el título
+# de la página (o carpeta) de la que cuelga. Se compara sin tildes ni mayúsculas.
+# ----------------------------------------------------------------------------
+CATEGORIES = [
+    {"name": "Universidades",               "color": "#2563eb", "keywords": ["universidad"]},  # azul
+    {"name": "Centros científico/técnicos", "color": "#16a34a", "keywords": ["centro"]},       # verde
+    {"name": "Spin-offs",                   "color": "#f97316", "keywords": ["spin"]},         # naranja
+    {"name": "Empresas",                    "color": "#475569", "keywords": ["empresa"]},      # gris pizarra
+    {"name": "Plataformas",                 "color": "#7c3aed", "keywords": ["plataforma"]},    # morado
+]
+OTHER = {"name": "Otros", "color": "#9ca3af", "keywords": []}  # gris, para lo que no encaje
 
 ROOT = Path(__file__).parent
 CACHE_FILE = ROOT / "geocache.json"
@@ -119,7 +135,80 @@ def extract_places(prop):
     elif t == "formula" and v.get("type") == "string" and v.get("string"):
         for s in split_text(v["string"]):
             out.append({"label": s, "query": s})
+    elif t == "rollup" and v.get("type") == "array":
+        for item in v.get("array", []):
+            out.extend(extract_places(item))
     return [p for p in out if p.get("coords") or p.get("query")]
+
+
+SUPPORTED_TYPES = {"place", "title", "rich_text", "select", "multi_select", "formula", "rollup"}
+
+
+# ------------------------------------------------- categorías (árbol de Notion)
+_node_cache = {}
+
+
+def get_node(kind, nid):
+    """Devuelve (título, parent) de una página, base de datos, bloque u origen de datos."""
+    key = (kind, nid)
+    if key in _node_cache:
+        return _node_cache[key]
+    path = {
+        "page_id": f"/pages/{nid}",
+        "database_id": f"/databases/{nid}",
+        "block_id": f"/blocks/{nid}",
+        "data_source_id": f"/data_sources/{nid}",
+    }[kind]
+    try:
+        obj = notion("GET", path)
+    except Exception:
+        _node_cache[key] = None  # p. ej. página no compartida con la conexión
+        return None
+    title = ""
+    kind_obj = obj.get("object")
+    if kind_obj == "page":
+        for p in obj.get("properties", {}).values():
+            if p.get("type") == "title":
+                title = plain(p.get("title"))
+                break
+    elif kind_obj == "block":
+        bt = obj.get("type")
+        if bt in ("child_page", "child_database"):
+            title = obj.get(bt, {}).get("title", "")
+    else:
+        title = plain(obj.get("title"))
+    node = (title, obj.get("parent") or {})
+    _node_cache[key] = node
+    return node
+
+
+def ancestor_titles(parent):
+    """Títulos de los ancestros, del más cercano al más lejano."""
+    titles = []
+    for _ in range(15):
+        ptype = parent.get("type")
+        if ptype not in ("page_id", "database_id", "block_id", "data_source_id"):
+            break
+        node = get_node(ptype, parent.get(ptype))
+        if not node:
+            break
+        title, parent = node
+        titles.append(title)
+    return titles
+
+
+def norm(s):
+    s = unicodedata.normalize("NFD", s or "")
+    return "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
+
+
+def categorize(ds_title, titles):
+    for t in titles + [ds_title]:  # primero los ancestros, de cerca a lejos
+        n = norm(t)
+        for cat in CATEGORIES:
+            if any(k in n for k in cat["keywords"]):
+                return cat
+    return OTHER
 
 
 # ------------------------------------------------------------ geocodificación
@@ -165,21 +254,39 @@ def main():
         ds_title = plain(ds.get("title")) or "Sin título"
         if not field:
             without_field.append(ds_title)
+            names = ", ".join(list(props)[:15])
+            print(f"× {ds_title}  (sin campo «{PROPERTY_NAME}»; campos: {names})")
             continue
         with_field.append(ds_title)
+
+        titles = ancestor_titles(ds.get("parent") or {})
+        cat = categorize(ds_title, titles)
+        route = " › ".join(t or "(sin título)" for t in reversed(titles)) or "(ruta no accesible)"
         title_prop = next((k for k, p in props.items() if p["type"] == "title"), None)
-        print(f"→ {ds_title}")
+        ftype = props[field]["type"]
+        n_pages = n_filled = n_points = 0
+        print(f"→ {ds_title}  [{cat['name']}]")
+        print(f"   ruta: {route}")
+        print(f"   campo «{field}», tipo: {ftype}")
+        if ftype not in SUPPORTED_TYPES:
+            print(f"   ! el tipo «{ftype}» no se puede leer; usa Place, texto, select o similar")
 
         for page in query_pages(ds["id"]):
+            n_pages += 1
             pprops = page.get("properties", {})
             page_title = plain(pprops.get(title_prop, {}).get("title")) or "Sin título"
-            for place in extract_places(pprops.get(field, {})):
+            found = extract_places(pprops.get(field, {}))
+            if found:
+                n_filled += 1
+            for place in found:
                 coords = place.get("coords") or geocode(place["query"], cache)
                 if not coords:
                     unresolved.append(f"{ds_title} · {page_title} · {place['label']}")
                     continue
+                n_points += 1
                 points.append(
                     {
+                        "cat": cat["name"],
                         "db": ds_title,
                         "title": page_title,
                         "place": place["label"],
@@ -188,14 +295,27 @@ def main():
                         "url": page.get("url", ""),
                     }
                 )
+        print(f"   páginas: {n_pages} · con «{field}» relleno: {n_filled} · pines: {n_points}")
 
-    points.sort(key=lambda p: (p["db"], p["title"], p["place"]))
+    order = {c["name"]: i for i, c in enumerate(CATEGORIES + [OTHER])}
+    points.sort(key=lambda p: (order.get(p["cat"], 99), p["db"], p["title"], p["place"]))
+
+    categories = []
+    for c in CATEGORIES + [OTHER]:
+        n = sum(1 for p in points if p["cat"] == c["name"])
+        if n:
+            categories.append({"name": c["name"], "color": c["color"], "count": n})
+
     print(f"\nBases con «{PROPERTY_NAME}»: {len(with_field)}  |  sin el campo: {len(without_field)}")
     if without_field:
         print("  Sin el campo (ignoradas):", ", ".join(without_field))
     print(f"Lugares en el mapa: {len(points)}  |  sin localizar: {len(unresolved)}")
+    for c in categories:
+        print(f"  · {c['name']}: {c['count']}")
     for u in unresolved:
         print("  - no localizado:", u)
+    if any(c["name"] == OTHER["name"] for c in categories):
+        print("  AVISO: hay bases en «Otros»; revisa las rutas de arriba y ajusta los keywords de CATEGORIES.")
     if not with_field:
         print(
             "\nAVISO: no se encontró ninguna base con ese campo. ¿Compartiste las páginas "
@@ -207,12 +327,17 @@ def main():
 
     # Solo se reescribe data.json si hay cambios reales (evita commits inútiles)
     old = json.loads(DATA_FILE.read_text()) if DATA_FILE.exists() else {}
-    if old.get("points") != points or old.get("unresolved") != len(unresolved):
+    if (
+        old.get("points") != points
+        or old.get("categories") != categories
+        or old.get("unresolved") != len(unresolved)
+    ):
         DATA_FILE.write_text(
             json.dumps(
                 {
                     "updated": datetime.now(timezone.utc).isoformat(timespec="minutes"),
                     "unresolved": len(unresolved),
+                    "categories": categories,
                     "points": points,
                 },
                 ensure_ascii=False,
