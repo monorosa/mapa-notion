@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de lugares</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+  #map { height: 100%; }
+  #info { position: absolute; z-index: 1000; left: 10px; bottom: 10px; background: rgba(255,255,255,.92);
+          padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #333; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .popup-title { font-weight: 600; margin-bottom: 2px; }
+  .popup-meta { color: #666; font-size: 12px; }
+  .legend { background: rgba(255,255,255,.95); padding: 8px 10px; border-radius: 8px; color: #222;
+            box-shadow: 0 1px 5px rgba(0,0,0,.35); font-size: 13px; line-height: 1.2; }
+  .legend h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+  .legend label { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; user-select: none; }
+  .legend .sw { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #111827; flex: none; }
+  .legend .n { color: #777; margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="info">Cargando…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const map = L.map("map").setView([40.4, -3.7], 5);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; colaboradores de OpenStreetMap"
+}).addTo(map);
+
+fetch("data.json?t=" + Date.now()).then(r => r.json()).then(data => {
+  // categorías: vienen de data.json (nombre, color, nº de pines)
+  const cats = (data.categories && data.categories.length)
+    ? data.categories
+    : [...new Set(data.points.map(p => p.cat || p.db))].map(n => ({ name: n, color: "#6b7280", count: 0 }));
+  const groups = {}, colorOf = {};
+  cats.forEach(c => { groups[c.name] = L.layerGroup().addTo(map); colorOf[c.name] = c.color; });
+
+  const bounds = [];
+  data.points.forEach(p => {
+    const key = p.cat || p.db;
+    if (!groups[key]) { groups[key] = L.layerGroup().addTo(map); colorOf[key] = "#6b7280"; }
+    const m = L.circleMarker([p.lat, p.lon], {
+      radius: 8, color: "#111827", weight: 1.5, fillColor: colorOf[key], fillOpacity: 0.95
+    });
+    const box = document.createElement("div");
+    const t = document.createElement("div"); t.className = "popup-title";
+    if (p.url) { const a = document.createElement("a"); a.href = p.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = p.title; t.appendChild(a); }
+    else t.textContent = p.title;
+    const meta = document.createElement("div"); meta.className = "popup-meta";
+    meta.textContent = (p.cat ? p.cat + " · " : "") + p.db + (p.place ? " · " + p.place : "");
+    box.append(t, meta);
+    m.bindPopup(box).addTo(groups[key]);
+    bounds.push([p.lat, p.lon]);
+  });
+
+  // leyenda con casillas para mostrar/ocultar cada categoría
+  const legend = L.control({ position: "topright" });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create("div", "legend");
+    L.DomEvent.disableClickPropagation(div);
+    const h = document.createElement("h4"); h.textContent = "Categorías"; div.appendChild(h);
+    cats.forEach(c => {
+      const label = document.createElement("label");
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+      cb.addEventListener("change", () => cb.checked ? map.addLayer(groups[c.name]) : map.removeLayer(groups[c.name]));
+      const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = c.color;
+      const name = document.createElement("span"); name.textContent = c.name;
+      const n = document.createElement("span"); n.className = "n"; n.textContent = c.count || "";
+      label.append(cb, sw, name, n);
+      div.appendChild(label);
+    });
+    return div;
+  };
+  legend.addTo(map);
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+  const d = new Date(data.updated);
+  document.getElementById("info").textContent =
+    `${data.points.length} lugares · actualizado ${d.toLocaleString("es-ES")}` +
+    (data.unresolved ? ` · ${data.unresolved} sin localizar` : "");
+}).catch(() => { document.getElementById("info").textContent = "No se pudo cargar data.json"; });
+</script>
+</body>
+</html>
