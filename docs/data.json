@@ -1,16 +1,31 @@
 {
- "updated": "2026-11-26T10:47+00:00",
+ "updated": "2026-11-26T10:54+00:00",
  "unresolved": 0,
- "points": [
+ "categories": [
   {
-   "db": "Catálogo de Spin-Offs",
-   "title": "SunIconSpace",
-   "place": "Instituto de Energía Solar",
-   "lat": 40.45309,
-   "lon": -3.72671,
-   "url": "https://app.notion.com/p/SunIconSpace-422d94147d508037b562d7a4ba64cae4"
+   "name": "Universidades",
+   "color": "#2563eb",
+   "count": 2
   },
   {
+   "name": "Spin-offs",
+   "color": "#f97316",
+   "count": 1
+  },
+  {
+   "name": "Empresas",
+   "color": "#475569",
+   "count": 2
+  },
+  {
+   "name": "Plataformas",
+   "color": "#7c3aed",
+   "count": 1
+  }
+ ],
+ "points": [
+  {
+   "cat": "Universidades",
    "db": "Departamentos - UCO",
    "title": "KDIS - UCO",
    "place": "Campus Los Rabanales",
@@ -19,6 +34,7 @@
    "url": "https://app.notion.com/p/KDIS-UCO-421d94147d50808881f4f174e771e4da"
   },
   {
+   "cat": "Universidades",
    "db": "Departamentos - UGR",
    "title": "ETSIIT - CITIC (TIC-117)",
    "place": "Calle Period. Rafael Gómez Montoro, 2, 18014 Granada (Granada), España",
@@ -27,6 +43,16 @@
    "url": "https://app.notion.com/p/ETSIIT-CITIC-TIC-117-41ed94147d508057bbfcfb321ab2175c"
   },
   {
+   "cat": "Spin-offs",
+   "db": "Catálogo de Spin-Offs",
+   "title": "SunIconSpace",
+   "place": "Instituto de Energía Solar",
+   "lat": 40.45309,
+   "lon": -3.72671,
+   "url": "https://app.notion.com/p/SunIconSpace-422d94147d508037b562d7a4ba64cae4"
+  },
+  {
+   "cat": "Empresas",
    "db": "Listado de empresas",
    "title": "ArcelorMittal ",
    "place": "Asturias, Principado de Asturias, España",
@@ -35,6 +61,7 @@
    "url": "https://app.notion.com/p/ArcelorMittal-421d94147d5080599781e00974167402"
   },
   {
+   "cat": "Empresas",
    "db": "Listado de empresas",
    "title": "TheNextPangea",
    "place": "La Granda, Gozón, Principado de Asturias, España",
@@ -43,6 +70,7 @@
    "url": "https://app.notion.com/p/TheNextPangea-421d94147d508003bcf0cae8facf45de"
   },
   {
+   "cat": "Plataformas",
    "db": "Listado de plataformas",
    "title": "materplat",
    "place": "Avenida Principal, 2, 36475 O Porriño (Pontevedra), España",
