@@ -1,11 +1,11 @@
 {
- "updated": "2026-11-26T10:54+00:00",
+ "updated": "2026-11-27T13:28+00:00",
  "unresolved": 0,
  "categories": [
   {
    "name": "Universidades",
    "color": "#2563eb",
-   "count": 2
+   "count": 3
   },
   {
    "name": "Spin-offs",
@@ -41,6 +41,15 @@
    "lat": 37.1976,
    "lon": -3.62391,
    "url": "https://app.notion.com/p/ETSIIT-CITIC-TIC-117-41ed94147d508057bbfcfb321ab2175c"
+  },
+  {
+   "cat": "Universidades",
+   "db": "Departamentos - UniZar",
+   "title": "Ingeniería Mecánica. Grupo VEHIVIAL",
+   "place": "Edificio Betancourt",
+   "lat": 41.68115,
+   "lon": -0.88335,
+   "url": "https://app.notion.com/p/Ingenier-a-Mec-nica-Grupo-VEHIVIAL-425d94147d50809e921edcc4cf172fd8"
   },
   {
    "cat": "Spin-offs",
